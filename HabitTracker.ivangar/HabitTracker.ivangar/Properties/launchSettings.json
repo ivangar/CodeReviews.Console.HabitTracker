@@ -1,0 +1,8 @@
+{
+  "profiles": {
+    "HabitTracker.ivangar": {
+      "commandName": "Project",
+      "workingDirectory": "C:\\Projects\\csharpacademy\\CodeReviews.Console.HabitTracker\\HabitTracker.ivangar\\HabitTracker.ivangar"
+    }
+  }
+}
