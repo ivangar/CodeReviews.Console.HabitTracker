@@ -1,6 +1,4 @@
-﻿using Microsoft.Data.Sqlite;
-using Spectre.Console;
-using System.Globalization;
+﻿using Spectre.Console;
 using static HabitTracker.ivangar.Enums;
 
 namespace HabitTracker.ivangar;
@@ -9,27 +7,12 @@ class Program
 {
     static string connectionString = @"Data Source=habit-Tracker.db";
 
+    private readonly static SqliteService _sqliteService = new(connectionString);
+
     static void Main(string[] args)
     {
 
-        using (var connection = new SqliteConnection(connectionString))
-        {
-            connection.Open();
-
-            var tableCmd = connection.CreateCommand();
-
-            tableCmd.CommandText =
-                @"CREATE TABLE IF NOT EXISTS drinking_water (
-                    Id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    Date TEXT,
-                    Quantity INTEGER
-                    )";
-
-            tableCmd.ExecuteNonQuery();
-
-            connection.Close();
-        }
-
+        _sqliteService.InitializeDatabase();
         GetUserInput();
     }
 
@@ -64,137 +47,101 @@ class Program
 
     public static void GetAllRecords()
     {
-        using (var connection = new SqliteConnection(connectionString))
+        var habits = _sqliteService.GetAll();
+
+        if (habits.Count != 0)
         {
-            List<DrinkingWater> records = [];
+            Menu.PrintItems(habits);
+            AnsiConsole.MarkupLine("Press Any Key to Continue.");
+            Console.ReadKey();
+        }
 
-            connection.Open();
-
-            var tableCmd = connection.CreateCommand();
-            tableCmd.CommandText = "SELECT * FROM drinking_water";
-
-            SqliteDataReader dataReader = tableCmd.ExecuteReader();
-
-            if (dataReader.HasRows)
-            {
-                while (dataReader.Read())
-                {
-                    records.Add(new DrinkingWater
-                    {
-                        Id = dataReader.GetInt32(0),
-                        Date = DateTime.ParseExact(dataReader.GetString(1), "dd-MM-yy", new CultureInfo("en-US")),
-                        Quantity = dataReader.GetInt32(2)
-                    }
-                    );
-                }
-
-                Menu.PrintItems(records);
-            }
-            else
-            {
-                Console.WriteLine("No rows found");
-                Console.ReadKey();
-            }
-
-            connection.Close();
+        else
+        {
+            AnsiConsole.MarkupLine("No rows found");
+            Console.ReadKey();
         }
     }
 
     public static void Insert()
     {
-        int inserted = 0;
         string date = Menu.GetDateInput();
         int qty = Menu.GetNumberInput("Please insert [green]number of glasses[/] or other measure of your choice (no decimals allowed)");
 
-        using (var connection = new SqliteConnection(connectionString))
-        {
-            connection.Open();
+        int inserted = _sqliteService.Insert(date, qty);
 
-            var tableCmd = connection.CreateCommand();
-            tableCmd.CommandText = $"INSERT INTO drinking_water(Date, Quantity) VALUES('{date}', {qty})";
-
-            inserted = tableCmd.ExecuteNonQuery();
-
-            connection.Close();
-        }
-
-        /* Move all DB transactions info into a new file helper */
         AnsiConsole.MarkupLine($"\n[DarkTurquoise]{inserted} {(inserted == 1 ? "row" : "rows")} inserted into the DB![/]");
         Console.ReadKey();
     }
 
     public static void Delete()
     {
-        GetAllRecords();
+        var habits = _sqliteService.GetAll();
+
+        if (habits.Count == 0)
+        {
+            AnsiConsole.MarkupLine($"\n[red]No Records found[/]");
+            Console.ReadKey();
+            return;
+        }
+
+        Menu.PrintItems(habits);
+
         var recordId = Menu.GetNumberInput("Please type the [yellow]Id[/] of the record you want to delete or type [green]0[/] to go back to Main Menu:");
 
         if (recordId == 0)
             return;
 
-        using (var connection = new SqliteConnection(connectionString))
+        if (!_sqliteService.Exists(recordId))
         {
-            connection.Open();
+            AnsiConsole.MarkupLine($"\n[red]Record with Id [bold]{recordId}[/] doesn't exist.[/]");
+            Console.ReadKey();
+            return;
+        }
 
-            var tableCmd = connection.CreateCommand();
-            tableCmd.CommandText = $"DELETE FROM drinking_water WHERE Id = {recordId}";
+        int deleted = _sqliteService.Delete(recordId);
 
-            int rowCount = tableCmd.ExecuteNonQuery();
-
-            if (rowCount == 0)
-            {
-                AnsiConsole.MarkupLine($"\n[red]Record with Id [bold]{recordId}[/] doesn't exist.[/]");
-                Console.ReadKey();
-                connection.Close();
-                return;
-            }
-
+        if (deleted == 1)
+        {
             AnsiConsole.MarkupLine($"\n[green]Record with Id [bold]{recordId}[/] was deleted.[/]");
             Console.ReadKey();
-
-            connection.Close();
         }
     }
 
     public static void Update()
     {
-        GetAllRecords();
+        var habits = _sqliteService.GetAll();
+
+        if (habits.Count == 0)
+        {
+            AnsiConsole.MarkupLine($"\n[red]No Records found[/]");
+            Console.ReadKey();
+            return;
+        }
+
+        Menu.PrintItems(habits);
+
         var recordId = Menu.GetNumberInput("Please type the [yellow]Id[/] of the record you want to update or type [green]0[/] to go back to Main Menu:");
 
         if (recordId == 0)
             return;
 
-        using (var connection = new SqliteConnection(connectionString))
+        if (!_sqliteService.Exists(recordId))
         {
-            connection.Open();
+            AnsiConsole.MarkupLine($"\n[red]Record with Id [bold]{recordId}[/] doesn't exist.[/]");
+            Console.ReadKey();
+            return;
+        }
 
-            var checkCmd = connection.CreateCommand();
-            checkCmd.CommandText = $"SELECT EXISTS(SELECT 1 FROM drinking_water WHERE Id = {recordId})";
-            int checkQuery = Convert.ToInt32(checkCmd.ExecuteScalar());
+        string date = Menu.GetDateInput();
+        int qty = Menu.GetNumberInput("Please insert [green]number of glasses[/] or other measure of your choice (no decimals allowed)");
 
-            if (checkQuery == 0)
-            {
-                AnsiConsole.MarkupLine($"\n[red]Record with Id [bold]{recordId}[/] doesn't exist.[/]");
-                Console.ReadKey();
-                connection.Close();
-                return;
-            }
+        int updated = _sqliteService.Update(recordId, date, qty);
 
-            string date = Menu.GetDateInput();
-            int qty = Menu.GetNumberInput("Please insert [green]number of glasses[/] or other measure of your choice (no decimals allowed)");
-
-            var tableCmd = connection.CreateCommand();
-            tableCmd.CommandText = $"UPDATE drinking_water SET date = '{date}', quantity = {qty} WHERE Id = {recordId}";
-
-            tableCmd.ExecuteNonQuery();
-
-            connection.Close();
+        if (updated == 1)
+        {
+            AnsiConsole.MarkupLine($"\n[green]Record with Id [bold]{recordId}[/] was updated.[/]");
+            Console.ReadKey();
         }
     }
-}
-
-public class DrinkingWater
-{
-    public int Id { get; set; }
-    public DateTime Date { get; set; }
-    public int Quantity { get; set; }
 }

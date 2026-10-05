@@ -1,4 +1,5 @@
-﻿using Spectre.Console;
+﻿using HabitTracker.ivangar.Models;
+using Spectre.Console;
 using static HabitTracker.ivangar.Enums;
 
 namespace HabitTracker.ivangar
@@ -62,8 +63,6 @@ namespace HabitTracker.ivangar
             }
 
             AnsiConsole.Write(table);
-            AnsiConsole.MarkupLine("Press Any Key to Continue.");
-            Console.ReadKey();
         }
     }
 }
