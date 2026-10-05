@@ -51,12 +51,10 @@ class Program
                     Insert();
                     break;
                 case MainMenu.DeleteRecord:
-                    AnsiConsole.MarkupLine($"\n[red]{MainMenu.InsertRecord} not implemented yet![/]");
-                    Console.ReadKey();
+                    Delete();
                     break;
                 case MainMenu.UpdateRecord:
-                    AnsiConsole.MarkupLine($"\n[red]{MainMenu.UpdateRecord} not implemented yet![/]");
-                    Console.ReadKey();
+                    Update();
                     break;
             }
         }
@@ -73,7 +71,7 @@ class Program
             connection.Open();
 
             var tableCmd = connection.CreateCommand();
-            tableCmd.CommandText = @"SELECT * FROM drinking_water";
+            tableCmd.CommandText = "SELECT * FROM drinking_water";
 
             SqliteDataReader dataReader = tableCmd.ExecuteReader();
 
@@ -102,7 +100,7 @@ class Program
         }
     }
 
-    private static void Insert()
+    public static void Insert()
     {
         int inserted = 0;
         string date = Menu.GetDateInput();
@@ -113,8 +111,7 @@ class Program
             connection.Open();
 
             var tableCmd = connection.CreateCommand();
-            tableCmd.CommandText = $@"INSERT INTO drinking_water(Date, Quantity) 
-                VALUES('{date}', {qty})";
+            tableCmd.CommandText = $"INSERT INTO drinking_water(Date, Quantity) VALUES('{date}', {qty})";
 
             inserted = tableCmd.ExecuteNonQuery();
 
@@ -124,6 +121,74 @@ class Program
         /* Move all DB transactions info into a new file helper */
         AnsiConsole.MarkupLine($"\n[DarkTurquoise]{inserted} {(inserted == 1 ? "row" : "rows")} inserted into the DB![/]");
         Console.ReadKey();
+    }
+
+    public static void Delete()
+    {
+        GetAllRecords();
+        var recordId = Menu.GetNumberInput("Please type the [yellow]Id[/] of the record you want to delete or type [green]0[/] to go back to Main Menu:");
+
+        if (recordId == 0)
+            return;
+
+        using (var connection = new SqliteConnection(connectionString))
+        {
+            connection.Open();
+
+            var tableCmd = connection.CreateCommand();
+            tableCmd.CommandText = $"DELETE FROM drinking_water WHERE Id = {recordId}";
+
+            int rowCount = tableCmd.ExecuteNonQuery();
+
+            if (rowCount == 0)
+            {
+                AnsiConsole.MarkupLine($"\n[red]Record with Id [bold]{recordId}[/] doesn't exist.[/]");
+                Console.ReadKey();
+                connection.Close();
+                return;
+            }
+
+            AnsiConsole.MarkupLine($"\n[green]Record with Id [bold]{recordId}[/] was deleted.[/]");
+            Console.ReadKey();
+
+            connection.Close();
+        }
+    }
+
+    public static void Update()
+    {
+        GetAllRecords();
+        var recordId = Menu.GetNumberInput("Please type the [yellow]Id[/] of the record you want to update or type [green]0[/] to go back to Main Menu:");
+
+        if (recordId == 0)
+            return;
+
+        using (var connection = new SqliteConnection(connectionString))
+        {
+            connection.Open();
+
+            var checkCmd = connection.CreateCommand();
+            checkCmd.CommandText = $"SELECT EXISTS(SELECT 1 FROM drinking_water WHERE Id = {recordId})";
+            int checkQuery = Convert.ToInt32(checkCmd.ExecuteScalar());
+
+            if (checkQuery == 0)
+            {
+                AnsiConsole.MarkupLine($"\n[red]Record with Id [bold]{recordId}[/] doesn't exist.[/]");
+                Console.ReadKey();
+                connection.Close();
+                return;
+            }
+
+            string date = Menu.GetDateInput();
+            int qty = Menu.GetNumberInput("Please insert [green]number of glasses[/] or other measure of your choice (no decimals allowed)");
+
+            var tableCmd = connection.CreateCommand();
+            tableCmd.CommandText = $"UPDATE drinking_water SET date = '{date}', quantity = {qty} WHERE Id = {recordId}";
+
+            tableCmd.ExecuteNonQuery();
+
+            connection.Close();
+        }
     }
 }
 

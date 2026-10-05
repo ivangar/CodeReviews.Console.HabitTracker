@@ -26,7 +26,6 @@ namespace HabitTracker.ivangar
 
         public static string GetDateInput()
         {
-            // var publishDate = AnsiConsole.Ask<DateTime>("Enter the [green]published date[/] of the newspaper (yyyy-mm-dd):");
             var habitDate = AnsiConsole.Ask<DateTime>("Please insert the [green]Habit date[/] (Format: yyyy-mm-dd):");
             return habitDate.ToString("dd-MM-yy");
         }
