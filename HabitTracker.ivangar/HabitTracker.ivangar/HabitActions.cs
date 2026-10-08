@@ -1,3 +1,4 @@
+using HabitTracker.ivangar.Models;
 using Microsoft.Extensions.Configuration;
 using Spectre.Console;
 
@@ -74,78 +75,76 @@ public class HabitActions
 
         int inserted = _sqliteService.Insert(date, qty);
 
-        AnsiConsole.MarkupLine($"\n[DarkTurquoise]{inserted} {(inserted == 1 ? "row" : "rows")} inserted into the DB![/]");
+        AnsiConsole.MarkupLine($"[DarkTurquoise]{inserted} {(inserted == 1 ? "row" : "rows")} inserted into the DB![/]");
         Console.ReadKey();
     }
 
     private void Delete()
     {
-        var habits = _sqliteService.GetAll();
+        var habits = GetHabits();
 
         if (habits.Count == 0)
-        {
-            AnsiConsole.MarkupLine($"\n[red]No Records found[/]");
-            Console.ReadKey();
             return;
-        }
 
         Menu.PrintItems(habits);
-
         var recordId = Menu.GetNumberInput("Please type the [yellow]Id[/] of the record you want to delete or type [green]0[/] to go back to Main Menu:");
 
-        if (recordId == 0)
+        if (recordId == 0 || !HabitExists(recordId))
             return;
 
-        if (!_sqliteService.Exists(recordId))
+        if (_sqliteService.Delete(recordId) == 1)
         {
-            AnsiConsole.MarkupLine($"\n[red]Record with Id [bold]{recordId}[/] doesn't exist.[/]");
-            Console.ReadKey();
-            return;
-        }
-
-        int deleted = _sqliteService.Delete(recordId);
-
-        if (deleted == 1)
-        {
-            AnsiConsole.MarkupLine($"\n[green]Record with Id [bold]{recordId}[/] was deleted.[/]");
+            AnsiConsole.MarkupLine($"[green]Record with Id [bold]{recordId}[/] was deleted.[/]");
             Console.ReadKey();
         }
     }
 
     private void Update()
     {
-        var habits = _sqliteService.GetAll();
+        var habits = GetHabits();
 
         if (habits.Count == 0)
-        {
-            AnsiConsole.MarkupLine($"\n[red]No Records found[/]");
-            Console.ReadKey();
             return;
-        }
 
         Menu.PrintItems(habits);
-
         var recordId = Menu.GetNumberInput("Please type the [yellow]Id[/] of the record you want to update or type [green]0[/] to go back to Main Menu:");
 
-        if (recordId == 0)
+        if (recordId == 0 || !HabitExists(recordId))
             return;
-
-        if (!_sqliteService.Exists(recordId))
-        {
-            AnsiConsole.MarkupLine($"\n[red]Record with Id [bold]{recordId}[/] doesn't exist.[/]");
-            Console.ReadKey();
-            return;
-        }
 
         string date = Menu.GetDateInput();
         int qty = Menu.GetNumberInput("Please insert [green]number of glasses[/] or other measure of your choice (no decimals allowed)");
 
-        int updated = _sqliteService.Update(recordId, date, qty);
-
-        if (updated == 1)
+        if (_sqliteService.Update(recordId, date, qty) == 1)
         {
-            AnsiConsole.MarkupLine($"\n[green]Record with Id [bold]{recordId}[/] was updated.[/]");
+            AnsiConsole.MarkupLine($"[green]Record with Id [bold]{recordId}[/] was updated.[/]");
             Console.ReadKey();
         }
+    }
+
+    private List<DrinkingWater> GetHabits()
+    {
+        var habits = _sqliteService.GetAll();
+
+        if (habits.Count == 0)
+        {
+            AnsiConsole.MarkupLine($"[red]No Records found[/]");
+            Console.ReadKey();
+        }
+
+        return habits;
+    }
+
+    private bool HabitExists(int habitId)
+    {
+        var habitExists = _sqliteService.Exists(habitId);
+
+        if (!habitExists)
+        {
+            AnsiConsole.MarkupLine($"[red]Record with Id [bold]{habitId}[/] doesn't exist.[/]");
+            Console.ReadKey();
+        }
+
+        return habitExists;
     }
 }
