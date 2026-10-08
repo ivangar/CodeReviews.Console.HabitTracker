@@ -1,15 +1,23 @@
+using Microsoft.Extensions.Configuration;
 using Spectre.Console;
 
 namespace HabitTracker.ivangar;
 
 public class HabitActions
 {
-    private static readonly string connectionString = @"Data Source=habit-Tracker.db";
-
-    private readonly SqliteService _sqliteService = new(connectionString);
+    private readonly SqliteService _sqliteService;
 
     public HabitActions()
     {
+        var configuration = new ConfigurationBuilder()
+            .SetBasePath(AppContext.BaseDirectory)
+            .AddJsonFile("appsettings.json", optional: false)
+            .Build();
+
+        string connectionString = configuration.GetConnectionString("HabitTracker")!;
+
+        _sqliteService = new SqliteService(connectionString);
+
         _sqliteService.InitializeDatabase();
     }
 

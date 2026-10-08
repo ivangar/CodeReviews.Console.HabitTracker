@@ -57,7 +57,7 @@ namespace HabitTracker.ivangar
             {
                 table.AddRow(
                     habit.Id.ToString(),
-                    $"[green]{habit.Date:dd-MMM-yyyy}[/]",
+                    $"[green]{habit.Date:yyyy-MM-dd}[/]",
                     $"[blue]{habit.Quantity}[/]"
                 );
             }
