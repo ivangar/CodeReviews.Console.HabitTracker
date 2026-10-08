@@ -28,7 +28,7 @@ namespace HabitTracker.ivangar
         public static string GetDateInput()
         {
             var habitDate = AnsiConsole.Ask<DateTime>("Please insert the [green]Habit date[/] (Format: yyyy-mm-dd):");
-            return habitDate.ToString("dd-MM-yy");
+            return habitDate.ToString("yyyy-MM-dd");
         }
 
         public static int GetNumberInput(string message)

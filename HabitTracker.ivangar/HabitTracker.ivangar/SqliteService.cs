@@ -27,6 +27,19 @@ public class SqliteService
                     )";
 
         tableCmd.ExecuteNonQuery();
+
+        SeedDatabase();
+    }
+
+    private void SeedDatabase()
+    {
+        var dbRecords = GetAll();
+
+        if (dbRecords.Count == 0)
+        {
+            foreach (var _ in Enumerable.Range(1, 5))
+                Insert(GetRandomDate(), GetRandomQty());
+        }
     }
 
     public List<DrinkingWater> GetAll()
@@ -47,7 +60,7 @@ public class SqliteService
             {
                 var dateText = dataReader.GetString(1);
                 DateTime parsedDate;
-                if (!DateTime.TryParseExact(dateText, "dd-MM-yy", new CultureInfo("en-US"), DateTimeStyles.None, out parsedDate))
+                if (!DateTime.TryParseExact(dateText, "yyyy-MM-dd", new CultureInfo("en-US"), DateTimeStyles.None, out parsedDate))
                 {
                     // Fallback to general parse if format differs
                     DateTime.TryParse(dateText, out parsedDate);
@@ -115,5 +128,49 @@ public class SqliteService
         tableCmd.Parameters.AddWithValue("$id", id);
 
         return tableCmd.ExecuteNonQuery();
+    }
+
+    public void ResetDatabase()
+    {
+        using var connection = new SqliteConnection(_connectionString);
+        connection.Open();
+
+        using var transaction = connection.BeginTransaction();
+
+        using (var cmdDeleteRows = new SqliteCommand(
+            "DELETE FROM drinking_water;", connection, transaction))
+        {
+            cmdDeleteRows.ExecuteNonQuery();
+        }
+
+        using (var cmdResetSeq = new SqliteCommand(
+            "DELETE FROM sqlite_sequence WHERE name = @tableName;", connection, transaction))
+        {
+            cmdResetSeq.Parameters.AddWithValue("@tableName", "drinking_water");
+            cmdResetSeq.ExecuteNonQuery();
+        }
+
+        transaction.Commit();
+    }
+
+
+    private static string GetRandomDate()
+    {
+        var random = new Random();
+
+        DateTime start = new DateTime(2015, 1, 1);
+        DateTime end = DateTime.Today;
+
+        int range = (end - start).Days;
+
+        DateTime randomDate = start.AddDays(random.Next(range + 1));
+
+        return randomDate.ToString("yyyy-MM-dd");
+    }
+
+    private static int GetRandomQty()
+    {
+        var random = new Random();
+        return random.Next(8);
     }
 }

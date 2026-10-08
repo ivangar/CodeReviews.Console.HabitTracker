@@ -18,7 +18,6 @@ public class HabitActions
         string connectionString = configuration.GetConnectionString("HabitTracker")!;
 
         _sqliteService = new SqliteService(connectionString);
-
         _sqliteService.InitializeDatabase();
     }
 
@@ -29,7 +28,11 @@ public class HabitActions
             var action = Menu.PrintMainMenu();
 
             if (action == Enums.MainMenu.CloseApplication)
+            {
+                _sqliteService.ResetDatabase();
+                AnsiConsole.MarkupLine("\n[green]The Database has been flushed\n[/]");
                 break;
+            }
 
             switch (action)
             {
