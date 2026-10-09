@@ -1,4 +1,5 @@
-﻿using HabitTracker.ivangar.Models;
+﻿using HabitTracker.ivangar.Extensions;
+using HabitTracker.ivangar.Models;
 using Spectre.Console;
 using static HabitTracker.ivangar.Enums;
 
@@ -22,6 +23,7 @@ namespace HabitTracker.ivangar
             return AnsiConsole.Prompt(
                     new SelectionPrompt<MainMenu>()
                     .Title("What would you like to do?")
+                    .UseConverter(x => x.GetDescription())
                     .AddChoices(Enum.GetValues<MainMenu>()));
         }
 
