@@ -74,7 +74,7 @@ public class HabitActions
     private void Insert()
     {
         string date = Menu.GetDateInput();
-        int qty = Menu.GetNumberInput("Please insert [green]number of glasses[/] or other measure of your choice (no decimals allowed)");
+        int qty = Menu.GetNumberInput("Please insert [green]number of glasses[/] or other measure of your choice (no decimals allowed):");
 
         int inserted = _sqliteService.Insert(date, qty);
 
@@ -115,8 +115,10 @@ public class HabitActions
         if (recordId == 0 || !HabitExists(recordId))
             return;
 
-        string date = Menu.GetDateInput();
-        int qty = Menu.GetNumberInput("Please insert [green]number of glasses[/] or other measure of your choice (no decimals allowed)");
+        DrinkingWater habit = habits.Find(h => h.Id == recordId)!;
+
+        string date = Menu.GetDateInput(habit.Date);
+        int qty = Menu.GetNumberInput("Please insert [green]number of glasses[/] or other measure of your choice (no decimals allowed):", habit.Quantity);
 
         if (_sqliteService.Update(recordId, date, qty) == 1)
         {

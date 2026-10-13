@@ -27,16 +27,26 @@ namespace HabitTracker.ivangar
                     .AddChoices(Enum.GetValues<MainMenu>()));
         }
 
-        public static string GetDateInput()
+        public static string GetDateInput(DateTime? date = null)
         {
-            var habitDate = AnsiConsole.Ask<DateTime>("Please insert the [green]Habit date[/] (Format: yyyy-mm-dd):");
+            DateTime defaultDate = date ?? DateTime.Today;
+
+            var habitDate = AnsiConsole.Prompt(
+                new TextPrompt<DateTime>("Please insert the [green]Habit date[/]:")
+                    .DefaultValue(defaultDate)
+            );
+
             return habitDate.ToString("yyyy-MM-dd");
         }
 
-        public static int GetNumberInput(string message)
+        public static int GetNumberInput(string message, int? defaultNumber = null)
         {
-            var numberInput = AnsiConsole.Ask<int>(message);
-            return numberInput;
+            var prompt = new TextPrompt<int>(message);
+
+            if (defaultNumber.HasValue)
+                prompt = prompt.DefaultValue(defaultNumber.Value);
+
+            return AnsiConsole.Prompt(prompt);
         }
 
         public static void PrintItems(List<DrinkingWater> habits)
