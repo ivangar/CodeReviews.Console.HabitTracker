@@ -1,13 +1,14 @@
 using HabitTracker.ivangar.Models;
+using HabitTracker.ivangar.Services;
 using Spectre.Console;
 
 namespace HabitTracker.ivangar;
 
 public class HabitManager
 {
-    private readonly SqliteService _sqliteService;
+    private readonly ISqliteService _sqliteService;
 
-    public HabitManager(SqliteService sqliteService)
+    public HabitManager(ISqliteService sqliteService)
     {
         _sqliteService = sqliteService ?? throw new ArgumentNullException(nameof(sqliteService));
     }

@@ -1,3 +1,4 @@
 <Solution>
+  <Project Path="HabitTracker.ivangar.Tests/HabitTracker.ivangar.Tests.csproj" Id="45e5be4d-8f14-49b1-abb9-1d2b1473b8c2" />
   <Project Path="HabitTracker.ivangar/HabitTracker.ivangar.csproj" />
 </Solution>

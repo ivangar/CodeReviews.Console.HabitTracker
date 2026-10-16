@@ -1,14 +1,15 @@
 using HabitTracker.ivangar.Models;
+using HabitTracker.ivangar.Services;
 using Spectre.Console;
 
 namespace HabitTracker.ivangar;
 
 public class HabitActions
 {
-    private readonly SqliteService _sqliteService;
+    private readonly ISqliteService _sqliteService;
     private readonly HabitManager _habitManager;
 
-    public HabitActions(SqliteService sqliteService)
+    public HabitActions(ISqliteService sqliteService)
     {
         _sqliteService = sqliteService ?? throw new ArgumentNullException(nameof(sqliteService));
         _habitManager = new HabitManager(_sqliteService);
@@ -46,31 +47,39 @@ public class HabitActions
         AnsiConsole.MarkupLine("\n[green]Thank you for visiting the Habit Tracker App\n[/]");
     }
 
+    // Extracted so tests can override and avoid blocking Console.ReadKey()
+    protected virtual void WaitForKey()
+    {
+        Console.ReadKey();
+    }
+
     private void ShowAll()
     {
-        var records = _sqliteService.GetAllRecords();
+        List<HabitRecord> records = _sqliteService.GetAllRecords();
 
         if (records.Count != 0)
         {
             Menu.PrintRecords(records);
             AnsiConsole.MarkupLine("Press Any Key to Continue.");
-            Console.ReadKey();
+            WaitForKey();
         }
         else
         {
             AnsiConsole.MarkupLine("No rows found");
-            Console.ReadKey();
+            // Also write to Console.Out so tests that capture Console.SetOut can observe the message.
+            Console.WriteLine($"No rows found");
+            WaitForKey();
         }
     }
 
     private void Insert()
     {
-        var habits = _sqliteService.GetHabits();
+        List<Habit> habits = _sqliteService.GetHabits();
 
         if (habits.Count == 0)
         {
             AnsiConsole.MarkupLine("[red]No habits found. Please create a habit first from 'Manage habits'.[/]");
-            Console.ReadKey();
+            WaitForKey();
             return;
         }
 
@@ -87,17 +96,17 @@ public class HabitActions
         int inserted = _sqliteService.InsertRecord(selected.Id, date, qty);
 
         AnsiConsole.MarkupLine($"\n[DarkTurquoise]{inserted} {(inserted == 1 ? "row" : "rows")} inserted into the DB![/]");
-        Console.ReadKey();
+        WaitForKey();
     }
 
     private void Delete()
     {
-        var records = _sqliteService.GetAllRecords();
+        List<HabitRecord> records = _sqliteService.GetAllRecords();
 
         if (records.Count == 0)
         {
             AnsiConsole.MarkupLine($"\n[red]No Records found[/]");
-            Console.ReadKey();
+            WaitForKey();
             return;
         }
 
@@ -113,18 +122,18 @@ public class HabitActions
         if (deleted == 1)
         {
             AnsiConsole.MarkupLine($"\n[green]Record with Id [bold]{recordId}[/] was deleted.[/]");
-            Console.ReadKey();
+            WaitForKey();
         }
     }
 
     private void Update()
     {
-        var records = _sqliteService.GetAllRecords();
+        List<HabitRecord> records = _sqliteService.GetAllRecords();
 
         if (records.Count == 0)
         {
             AnsiConsole.MarkupLine($"\n[red]No Records found[/]");
-            Console.ReadKey();
+            WaitForKey();
             return;
         }
 
@@ -144,7 +153,7 @@ public class HabitActions
         if (updated == 1)
         {
             AnsiConsole.MarkupLine($"\n[green]Record with Id [bold]{recordId}[/] was updated.[/]");
-            Console.ReadKey();
+            WaitForKey();
         }
     }
 
@@ -155,7 +164,9 @@ public class HabitActions
         if (record == null)
         {
             AnsiConsole.MarkupLine($"[red]Record with Id [bold]{recordId}[/] doesn't exist.[/]");
-            Console.ReadKey();
+            // Also write to Console.Out so tests that capture Console.SetOut can observe the message.
+            Console.WriteLine($"Record with Id {recordId} doesn't exist.");
+            WaitForKey();
             return false;
         }
 

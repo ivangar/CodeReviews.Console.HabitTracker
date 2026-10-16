@@ -3,9 +3,9 @@ using Microsoft.Data.Sqlite;
 using Microsoft.Extensions.Configuration;
 using System.Globalization;
 
-namespace HabitTracker.ivangar;
+namespace HabitTracker.ivangar.Services;
 
-public class SqliteService
+public class SqliteService : ISqliteService
 {
     private readonly string _connectionString;
 
@@ -55,7 +55,7 @@ public class SqliteService
             SeedDatabase(connection);
     }
 
-    private void SeedDatabase(SqliteConnection connection)
+    public void SeedDatabase(SqliteConnection connection)
     {
         using var transaction = connection.BeginTransaction();
 
