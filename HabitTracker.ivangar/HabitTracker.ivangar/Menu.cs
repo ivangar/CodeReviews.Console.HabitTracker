@@ -9,6 +9,7 @@ namespace HabitTracker.ivangar
     {
         public static void DisplayTitle()
         {
+            AnsiConsole.Clear();
             AnsiConsole.Write(
                 new FigletText("Habit Tracker App")
                     .Centered()
@@ -17,7 +18,6 @@ namespace HabitTracker.ivangar
 
         public static MainMenu PrintMainMenu()
         {
-            Console.Clear();
             DisplayTitle();
 
             return AnsiConsole.Prompt(
@@ -27,12 +27,12 @@ namespace HabitTracker.ivangar
                     .AddChoices(Enum.GetValues<MainMenu>()));
         }
 
-        public static string GetDateInput(DateTime? date = null)
+        public static string GetDateInput(string message, DateTime? date = null)
         {
             DateTime defaultDate = date ?? DateTime.Today;
 
             var habitDate = AnsiConsole.Prompt(
-                new TextPrompt<DateTime>("Please insert the [green]Habit date[/]:")
+                new TextPrompt<DateTime>(message)
                     .DefaultValue(defaultDate)
             );
 
@@ -49,9 +49,49 @@ namespace HabitTracker.ivangar
             return AnsiConsole.Prompt(prompt);
         }
 
-        public static void PrintItems(List<DrinkingWater> habits)
+        public static string GetStringInput(string message, string? defaultValue = null)
+        {
+            var prompt = new TextPrompt<string>(message)
+                .Validate(input =>
+                    !string.IsNullOrEmpty(input) && input.All(c => char.IsLetter(c) || char.IsWhiteSpace(c))
+                        ? ValidationResult.Success()
+                        : ValidationResult.Error("[red]Only alphabetic characters are allowed.[/]"));
+
+            if (!string.IsNullOrEmpty(defaultValue))
+                prompt = prompt.DefaultValue(defaultValue!);
+            return AnsiConsole.Prompt(prompt);
+        }
+
+        public static void PrintHabits(List<Habit> habits)
         {
             if (habits.Count == 0)
+            {
+                AnsiConsole.MarkupLine("[red]No habits available.[/]");
+                Console.ReadKey();
+                return;
+            }
+
+            var table = new Table();
+            table.Border(TableBorder.Rounded)
+                .AddColumn("[yellow]Id[/]")
+                .AddColumn("[yellow]Name[/]")
+                .AddColumn("[yellow]Unit[/]");
+
+            foreach (var h in habits)
+            {
+                table.AddRow(
+                    h.Id.ToString(),
+                    $"[green]{h.Name}[/]",
+                    $"[blue]{h.Unit}[/]"
+                );
+            }
+
+            AnsiConsole.Write(table);
+        }
+
+        public static void PrintRecords(List<HabitRecord> records)
+        {
+            if (records.Count == 0)
             {
                 AnsiConsole.MarkupLine("[red]No records available.[/]");
                 Console.ReadKey();
@@ -59,18 +99,20 @@ namespace HabitTracker.ivangar
             }
 
             var table = new Table();
-
             table.Border(TableBorder.Rounded)
                 .AddColumn("[yellow]Id[/]")
                 .AddColumn("[yellow]Date[/]")
+                .AddColumn("[yellow]Habit[/]")
                 .AddColumn("[yellow]Quantity[/]");
 
-            foreach (var habit in habits)
+            foreach (var r in records)
             {
+                var unitText = string.IsNullOrEmpty(r.Unit) ? string.Empty : $" {r.Unit}";
                 table.AddRow(
-                    habit.Id.ToString(),
-                    $"[green]{habit.Date:yyyy-MM-dd}[/]",
-                    $"[blue]{habit.Quantity}[/]"
+                    r.Id.ToString(),
+                    $"[green]{r.Date:yyyy-MM-dd}[/]",
+                    $"[blue]{r.HabitName}{unitText}[/]",
+                    $"[blue]{r.Quantity}[/]"
                 );
             }
 

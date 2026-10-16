@@ -6,6 +6,9 @@ namespace HabitTracker.ivangar
     {
         public enum MainMenu
         {
+            [Description("Manage habits")]
+            ManageHabits,
+
             [Description("View all records")]
             ViewAllRecords,
 

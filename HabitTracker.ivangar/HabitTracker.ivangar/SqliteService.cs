@@ -1,5 +1,6 @@
 using HabitTracker.ivangar.Models;
 using Microsoft.Data.Sqlite;
+using Microsoft.Extensions.Configuration;
 using System.Globalization;
 
 namespace HabitTracker.ivangar;
@@ -8,9 +9,14 @@ public class SqliteService
 {
     private readonly string _connectionString;
 
-    public SqliteService(string connectionString)
+    public SqliteService()
     {
-        _connectionString = connectionString ?? throw new ArgumentNullException(nameof(connectionString));
+        var configuration = new ConfigurationBuilder()
+            .SetBasePath(AppContext.BaseDirectory)
+            .AddJsonFile("appsettings.json", optional: false)
+            .Build();
+
+        _connectionString = configuration.GetConnectionString("HabitTracker")!;
     }
 
     public void InitializeDatabase()
@@ -19,158 +25,209 @@ public class SqliteService
         connection.Open();
 
         using var tableCmd = connection.CreateCommand();
-        tableCmd.CommandText =
-            @"CREATE TABLE IF NOT EXISTS drinking_water (
-                    Id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    Date TEXT,
-                    Quantity INTEGER
-                    )";
 
+        // Remove legacy table if present
+        tableCmd.CommandText = "DROP TABLE IF EXISTS drinking_water;";
         tableCmd.ExecuteNonQuery();
 
-        SeedDatabase();
+        // Create habits table
+        tableCmd.CommandText =
+            @"CREATE TABLE IF NOT EXISTS habits (
+                    Id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    Name TEXT NOT NULL,
+                    Unit TEXT
+                );";
+        tableCmd.ExecuteNonQuery();
+
+        // Create habit_records table with FK and cascade delete
+        tableCmd.CommandText =
+            @"CREATE TABLE IF NOT EXISTS habit_records (
+                    Id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    HabitId INTEGER NOT NULL,
+                    Date TEXT NOT NULL,
+                    Quantity INTEGER NOT NULL,
+                    FOREIGN KEY(HabitId) REFERENCES habits(Id) ON DELETE CASCADE
+                );";
+        tableCmd.ExecuteNonQuery();
+
+        // Seed data when no habits exist
+        if (GetHabits().Count == 0)
+            SeedDatabase(connection);
     }
 
-    private void SeedDatabase()
+    private void SeedDatabase(SqliteConnection connection)
     {
-        var dbRecords = GetAll();
-
-        if (dbRecords.Count == 0)
-        {
-            foreach (var _ in Enumerable.Range(1, 5))
-                Insert(GetRandomDate(), GetRandomQty());
-        }
-    }
-
-    public List<DrinkingWater> GetAll()
-    {
-        var records = new List<DrinkingWater>();
-
-        using var connection = new SqliteConnection(_connectionString);
-        connection.Open();
-
-        using var tableCmd = connection.CreateCommand();
-        tableCmd.CommandText = "SELECT Id, Date, Quantity FROM drinking_water";
-
-        using var dataReader = tableCmd.ExecuteReader();
-
-        if (dataReader.HasRows)
-        {
-            while (dataReader.Read())
-            {
-                var dateText = dataReader.GetString(1);
-                DateTime parsedDate;
-                if (!DateTime.TryParseExact(dateText, "yyyy-MM-dd", new CultureInfo("en-US"), DateTimeStyles.None, out parsedDate))
-                {
-                    // Fallback to general parse if format differs
-                    DateTime.TryParse(dateText, out parsedDate);
-                }
-
-                records.Add(new DrinkingWater
-                {
-                    Id = dataReader.GetInt32(0),
-                    Date = parsedDate,
-                    Quantity = dataReader.GetInt32(2)
-                });
-            }
-        }
-
-        return records;
-    }
-
-    public int Insert(string date, int quantity)
-    {
-        using var connection = new SqliteConnection(_connectionString);
-        connection.Open();
-
-        using var tableCmd = connection.CreateCommand();
-        tableCmd.CommandText = "INSERT INTO drinking_water(Date, Quantity) VALUES($date, $qty)";
-        tableCmd.Parameters.AddWithValue("$date", date);
-        tableCmd.Parameters.AddWithValue("$qty", quantity);
-
-        return tableCmd.ExecuteNonQuery();
-    }
-
-    public int Delete(int id)
-    {
-        using var connection = new SqliteConnection(_connectionString);
-        connection.Open();
-
-        using var tableCmd = connection.CreateCommand();
-        tableCmd.CommandText = "DELETE FROM drinking_water WHERE Id = $id";
-        tableCmd.Parameters.AddWithValue("$id", id);
-
-        return tableCmd.ExecuteNonQuery();
-    }
-
-    public bool Exists(int id)
-    {
-        using var connection = new SqliteConnection(_connectionString);
-        connection.Open();
-
-        using var checkCmd = connection.CreateCommand();
-        checkCmd.CommandText = "SELECT EXISTS(SELECT 1 FROM drinking_water WHERE Id = $id)";
-        checkCmd.Parameters.AddWithValue("$id", id);
-
-        var result = checkCmd.ExecuteScalar();
-        return Convert.ToInt32(result) == 1;
-    }
-
-    public int Update(int id, string date, int quantity)
-    {
-        using var connection = new SqliteConnection(_connectionString);
-        connection.Open();
-
-        using var tableCmd = connection.CreateCommand();
-        tableCmd.CommandText = "UPDATE drinking_water SET Date = $date, Quantity = $qty WHERE Id = $id";
-        tableCmd.Parameters.AddWithValue("$date", date);
-        tableCmd.Parameters.AddWithValue("$qty", quantity);
-        tableCmd.Parameters.AddWithValue("$id", id);
-
-        return tableCmd.ExecuteNonQuery();
-    }
-
-    public void ResetDatabase()
-    {
-        using var connection = new SqliteConnection(_connectionString);
-        connection.Open();
-
         using var transaction = connection.BeginTransaction();
 
-        using (var cmdDeleteRows = new SqliteCommand(
-            "DELETE FROM drinking_water;", connection, transaction))
+        var seedHabits = new List<(string Name, string Unit)>
         {
-            cmdDeleteRows.ExecuteNonQuery();
+            ("Drinking Water", "glasses"),
+            ("Walking", "steps"),
+            ("Reading", "pages")
+        };
+
+        var habitIds = new List<int>();
+
+        foreach (var (name, unit) in seedHabits)
+        {
+            using var insertHabit = connection.CreateCommand();
+            insertHabit.CommandText = "INSERT INTO habits(Name, Unit) VALUES($name, $unit); SELECT last_insert_rowid();";
+            insertHabit.Parameters.AddWithValue("$name", name);
+            insertHabit.Parameters.AddWithValue("$unit", unit);
+            var idObj = insertHabit.ExecuteScalar();
+            var id = Convert.ToInt32(idObj);
+            habitIds.Add(id);
         }
 
-        using (var cmdResetSeq = new SqliteCommand(
-            "DELETE FROM sqlite_sequence WHERE name = @tableName;", connection, transaction))
+        var rnd = new Random();
+        var today = DateTime.Today;
+        var start = today.AddDays(-90);
+
+        for (int i = 0; i < 100; i++)
         {
-            cmdResetSeq.Parameters.AddWithValue("@tableName", "drinking_water");
-            cmdResetSeq.ExecuteNonQuery();
+            int habitId = habitIds[rnd.Next(habitIds.Count)];
+
+            var date = start.AddDays(rnd.Next((today - start).Days + 1)).ToString("yyyy-MM-dd");
+            int qty = rnd.Next(1, 11);
+
+            using var insertRecord = connection.CreateCommand();
+            insertRecord.CommandText = "INSERT INTO habit_records(HabitId, Date, Quantity) VALUES($hid, $date, $qty);";
+            insertRecord.Parameters.AddWithValue("$hid", habitId);
+            insertRecord.Parameters.AddWithValue("$date", date);
+            insertRecord.Parameters.AddWithValue("$qty", qty);
+            insertRecord.ExecuteNonQuery();
         }
 
         transaction.Commit();
     }
 
-
-    private static string GetRandomDate()
+    // Habit CRUD
+    public List<Habit> GetHabits()
     {
-        var random = new Random();
+        var list = new List<Habit>();
 
-        DateTime start = new DateTime(2015, 1, 1);
-        DateTime end = DateTime.Today;
+        using var connection = new SqliteConnection(_connectionString);
+        connection.Open();
 
-        int range = (end - start).Days;
+        using var cmd = connection.CreateCommand();
+        cmd.CommandText = "SELECT Id, Name, Unit FROM habits ORDER BY Name";
 
-        DateTime randomDate = start.AddDays(random.Next(range + 1));
+        using var reader = cmd.ExecuteReader();
+        while (reader.Read())
+        {
+            list.Add(new Habit
+            {
+                Id = reader.GetInt32(0),
+                Name = reader.GetString(1),
+                Unit = reader.IsDBNull(2) ? string.Empty : reader.GetString(2)
+            });
+        }
 
-        return randomDate.ToString("yyyy-MM-dd");
+        return list;
     }
 
-    private static int GetRandomQty()
+    public int CreateHabit(string name, string unit)
     {
-        var random = new Random();
-        return random.Next(8);
+        using var connection = new SqliteConnection(_connectionString);
+        connection.Open();
+
+        using var cmd = connection.CreateCommand();
+        cmd.CommandText = "INSERT INTO habits(Name, Unit) VALUES($name, $unit); SELECT last_insert_rowid();";
+        cmd.Parameters.AddWithValue("$name", name);
+        cmd.Parameters.AddWithValue("$unit", unit ?? string.Empty);
+        var idObj = cmd.ExecuteScalar();
+        return Convert.ToInt32(idObj);
+    }
+
+    public int UpdateHabit(int id, string name, string unit)
+    {
+        using var connection = new SqliteConnection(_connectionString);
+        connection.Open();
+        using var cmd = connection.CreateCommand();
+        cmd.CommandText = "UPDATE habits SET Name = $name, Unit = $unit WHERE Id = $id";
+        cmd.Parameters.AddWithValue("$name", name);
+        cmd.Parameters.AddWithValue("$unit", unit ?? string.Empty);
+        cmd.Parameters.AddWithValue("$id", id);
+        return cmd.ExecuteNonQuery();
+    }
+
+    public int DeleteHabit(int id)
+    {
+        using var connection = new SqliteConnection(_connectionString);
+        connection.Open();
+        using var cmd = connection.CreateCommand();
+        cmd.CommandText = "DELETE FROM habits WHERE Id = $id";
+        cmd.Parameters.AddWithValue("$id", id);
+        return cmd.ExecuteNonQuery();
+    }
+
+    // Record CRUD
+    public List<HabitRecord> GetAllRecords()
+    {
+        var list = new List<HabitRecord>();
+
+        using var connection = new SqliteConnection(_connectionString);
+        connection.Open();
+
+        using var cmd = connection.CreateCommand();
+        cmd.CommandText = @"SELECT hr.Id, hr.HabitId, hr.Date, hr.Quantity, h.Name, h.Unit
+                            FROM habit_records hr
+                            JOIN habits h ON hr.HabitId = h.Id
+                            ORDER BY hr.Date DESC";
+
+        using var reader = cmd.ExecuteReader();
+        while (reader.Read())
+        {
+            var dateText = reader.GetString(2);
+            DateTime parsedDate;
+            if (!DateTime.TryParseExact(dateText, "yyyy-MM-dd", new CultureInfo("en-US"), DateTimeStyles.None, out parsedDate))
+                DateTime.TryParse(dateText, out parsedDate);
+
+            list.Add(new HabitRecord
+            {
+                Id = reader.GetInt32(0),
+                HabitId = reader.GetInt32(1),
+                Date = parsedDate,
+                Quantity = reader.GetInt32(3),
+                HabitName = reader.GetString(4),
+                Unit = reader.IsDBNull(5) ? string.Empty : reader.GetString(5)
+            });
+        }
+
+        return list;
+    }
+
+    public int InsertRecord(int habitId, string date, int quantity)
+    {
+        using var connection = new SqliteConnection(_connectionString);
+        connection.Open();
+        using var cmd = connection.CreateCommand();
+        cmd.CommandText = "INSERT INTO habit_records(HabitId, Date, Quantity) VALUES($hid, $date, $qty)";
+        cmd.Parameters.AddWithValue("$hid", habitId);
+        cmd.Parameters.AddWithValue("$date", date);
+        cmd.Parameters.AddWithValue("$qty", quantity);
+        return cmd.ExecuteNonQuery();
+    }
+
+    public int UpdateRecord(int id, string date, int quantity)
+    {
+        using var connection = new SqliteConnection(_connectionString);
+        connection.Open();
+        using var cmd = connection.CreateCommand();
+        cmd.CommandText = "UPDATE habit_records SET Date = $date, Quantity = $qty WHERE Id = $id";
+        cmd.Parameters.AddWithValue("$date", date);
+        cmd.Parameters.AddWithValue("$qty", quantity);
+        cmd.Parameters.AddWithValue("$id", id);
+        return cmd.ExecuteNonQuery();
+    }
+
+    public int DeleteRecord(int id)
+    {
+        using var connection = new SqliteConnection(_connectionString);
+        connection.Open();
+        using var cmd = connection.CreateCommand();
+        cmd.CommandText = "DELETE FROM habit_records WHERE Id = $id";
+        cmd.Parameters.AddWithValue("$id", id);
+        return cmd.ExecuteNonQuery();
     }
 }
